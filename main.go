@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"app/pkg/handlers"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -12,47 +12,18 @@ func main() {
 }
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	var user User
-	err := json.Unmarshal([]byte(request.Body), &user)
-
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Body:       generateErrorBodyWithMessages("Invalid payload."),
-		}, err
+	switch request.HTTPMethod {
+	case "GET":
+		return handlers.GetUser(request)
+	case "POST":
+		return handlers.CreateUser(request)
+	case "PUT":
+	case "PATCH":
+		return handlers.UpdateUser(request)
+	case "DELETE":
+		return handlers.DeleteUser(request)
+	default:
+		return handlers.UnhandledMethod()
 	}
-
-}
-
-func generateErrorBodyWithMessages(message string) string {
-	errorResponse := ErrorResponseBody{
-		Message: message,
-	}
-
-	jbytes, err := json.Marshal(errorResponse)
-
-	if err != nil {
-		return "Something went wrong, please try again later."
-	}
-
-	return string(jbytes)
-}
-
-type User struct {
-	ID              int      `json:"id"`
-	Name            string   `json:"name"`
-	Email           string   `json:"email"`
-	Bio             string   `json:"bio"`
-	PhoneNumber     string   `json:"phoneNumber"`
-	SocialMediaURLs string   `json:"socialMediaUrls"`
-	Templates       []string `json:"templates"`
-}
-
-type BusinessCard struct {
-	QRCode string `json:"qrCode"`
-	User   User   `json:"userInfo"`
-}
-
-type ErrorResponseBody struct {
-	Message string `json:"message"`
+	return handlers.UnhandledMethod()
 }
