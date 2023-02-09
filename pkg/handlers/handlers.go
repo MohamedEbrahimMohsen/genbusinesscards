@@ -1,82 +1,58 @@
 package handlers
 
 import (
-	"app/pkg/models"
+	"app/pkg/user"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-func CreateUser(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	var user models.User
-	err := json.Unmarshal([]byte(request.Body), &user)
+func CreateUser(request events.APIGatewayProxyRequest, tableName string, dynaClient *dynamodb.DynamoDB) (*events.APIGatewayProxyResponse, error) {
+	log.Println("Creating new user...")
+	var usr user.User
 
+	err := json.Unmarshal([]byte(request.Body), &usr)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Body:       generateErrorBodyWithMessages("Invalid payload."),
-		}, err
+		log.Printf("Got error while unmarshalling the request body: %s\n", err)
+		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
 	}
 
-	// TODO: save to database
+	_, err = user.CreateUser(&usr, tableName, dynaClient)
+	if err != nil {
+		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
+	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusCreated,
-		Body:       user.ToJson(),
-	}, err
+	return apiResponse(http.StatusCreated, usr)
 }
 
-func GetUser(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	user := models.User{
+func GetUser(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+	user := user.User{
 		Name: "Dummy GET User",
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       user.ToJson(),
-	}, nil
+	return apiResponse(http.StatusOK, user)
 }
 
-func UpdateUser(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	user := models.User{
+func UpdateUser(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+	user := user.User{
 		Name: "Dummy Update User",
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       user.ToJson(),
-	}, nil
+	return apiResponse(http.StatusOK, user)
 }
 
-func DeleteUser(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	user := models.User{
+func DeleteUser(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+	user := user.User{
 		Name: "Dummy Delete User",
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       user.ToJson(),
-	}, nil
+	return apiResponse(http.StatusOK, user)
 }
 
-func UnhandledMethod() (events.APIGatewayProxyResponse, error) {
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusMethodNotAllowed,
-		Body:       generateErrorBodyWithMessages("Method not allowed."),
-	}, nil
-}
-
-func generateErrorBodyWithMessages(message string) string {
-	errorResponse := models.ErrorResponseBody{
-		Message: message,
-	}
-
-	jbytes, err := json.Marshal(errorResponse)
-
-	if err != nil {
-		return "Something went wrong, please try again later."
-	}
-
-	return string(jbytes)
+func UnhandledMethod() (*events.APIGatewayProxyResponse, error) {
+	return apiResponse(http.StatusMethodNotAllowed, ErrorBody{ErrorMsg: aws.String("Method Not Allowed")})
 }
