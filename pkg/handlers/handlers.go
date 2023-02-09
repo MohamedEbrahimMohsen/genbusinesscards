@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"app/pkg/user"
+	"app/pkg/validators"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -21,6 +22,11 @@ func CreateUser(request events.APIGatewayProxyRequest, tableName string, dynaCli
 		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
 	}
 
+	if !validators.IsEmailValid(usr.Email) {
+		log.Printf("Invalid email format.")
+		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String("Invalid email format.")})
+	}
+
 	_, err = user.CreateUser(&usr, tableName, dynaClient)
 	if err != nil {
 		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
@@ -29,12 +35,22 @@ func CreateUser(request events.APIGatewayProxyRequest, tableName string, dynaCli
 	return apiResponse(http.StatusCreated, usr)
 }
 
-func GetUser(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
-	user := user.User{
-		Name: "Dummy GET User",
+func GetUser(request events.APIGatewayProxyRequest, tableName string, dynaClient *dynamodb.DynamoDB) (*events.APIGatewayProxyResponse, error) {
+	email := request.QueryStringParameters["email"]
+
+	if len(email) > 0 {
+		usr, err := user.FetchUser(email, tableName, dynaClient)
+		if err != nil {
+			return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
+		}
+		return apiResponse(http.StatusOK, &usr)
 	}
 
-	return apiResponse(http.StatusOK, user)
+	usr, err := user.FetchUsers(email, tableName, dynaClient)
+	if err != nil {
+		return apiResponse(http.StatusBadRequest, ErrorBody{ErrorMsg: aws.String(err.Error())})
+	}
+	return apiResponse(http.StatusOK, &usr)
 }
 
 func UpdateUser(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {

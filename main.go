@@ -42,7 +42,7 @@ func handler(request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResp
 
 	switch request.HTTPMethod {
 	case "GET":
-		return handlers.GetUser(request)
+		return handlers.GetUser(request, TABLE_NAME, dynaClient)
 	case "POST":
 		return handlers.CreateUser(request, TABLE_NAME, dynaClient)
 	case "PUT":
