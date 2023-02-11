@@ -52,6 +52,7 @@ func FetchUsers(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 	return users, nil
 }
 
+// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/dynamo-example-create-table-item.html
 func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
 	av, err := dynamodbattribute.MarshalMap(usr)
 	if err != nil {
@@ -66,7 +67,7 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 
 	if currUser != nil {
 		log.Printf("email already exist.")
-		return nil, errors.New("email already exist.")
+		return nil, errors.New("email already exist")
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -84,11 +85,55 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	return usr, nil
 }
 
-func UpdateUser() {
+func UpdateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
+	_, err := FetchUser(usr.Email, tableName, dynaClient)
 
+	if err != nil {
+		return nil, errors.New("no user registered with this email")
+	}
+
+	av, err := dynamodbattribute.MarshalMap(usr)
+	if err != nil {
+		log.Printf("Got error marshalling new user: %s\n", err)
+		return nil, errors.New("got error while deserialzing the user's info")
+	}
+
+	dynaClient.PutItem(&dynamodb.PutItemInput{
+		Item:      av,
+		TableName: &tableName,
+	})
+
+	return usr, nil
 }
 
-func DeleteUser() {
+// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/LegacyConditionalParameters.AttributeUpdates.html
+// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/dynamo-example-update-table-item.html
+func PatchUpdateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
+	// NOT IMPLEMENTED!
+	return UpdateUser(usr, tableName, dynaClient)
+}
+
+// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/dynamo-example-delete-table-item.html
+func DeleteUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
+	usr, err := FetchUser(email, tableName, dynaClient)
+
+	if err != nil {
+		log.Printf("not found email for deleting: %v\n", email)
+		return nil, errors.New("no user registered with this email")
+	}
+
+	key, _ := dynamodbattribute.MarshalMap(email)
+	_, err = dynaClient.DeleteItem(&dynamodb.DeleteItemInput{
+		Key:       key,
+		TableName: &tableName,
+	})
+
+	if err != nil {
+		log.Printf("got error while deleting user: %s\n", err)
+		return nil, err
+	}
+
+	return usr, nil
 }
 
 type User struct {
