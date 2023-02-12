@@ -4,10 +4,14 @@ import (
 	"errors"
 	"log"
 
+	"app/pkg/services"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
+
+const BASE_URL = "https://gbc/profile/"
 
 func FetchUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
 	input := &dynamodb.GetItemInput{
@@ -59,7 +63,13 @@ func FetchUsers(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 
 // https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/dynamo-example-create-table-item.html
 func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
-	av, err := dynamodbattribute.MarshalMap(usr)
+	qr, err := services.GenerateQR(BASE_URL + usr.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	usr.QRCode = qr
+	item, err := dynamodbattribute.MarshalMap(usr)
 	if err != nil {
 		log.Printf("Got error marshalling new user: %s\n", err)
 		return nil, errors.New("got error marshalling new user")
@@ -76,7 +86,7 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	}
 
 	input := &dynamodb.PutItemInput{
-		Item:      av,
+		Item:      item,
 		TableName: aws.String(tableName),
 	}
 
@@ -97,6 +107,12 @@ func UpdateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 		return nil, errors.New("no user registered with this email")
 	}
 
+	qr, err := services.GenerateQR(BASE_URL + usr.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	usr.QRCode = qr
 	av, err := dynamodbattribute.MarshalMap(usr)
 	if err != nil {
 		log.Printf("Got error marshalling new user: %s\n", err)
@@ -151,9 +167,5 @@ type User struct {
 	PhoneNumber     string   `json:"phoneNumber"`
 	SocialMediaURLs string   `json:"socialMediaUrls"`
 	Templates       []string `json:"templates"`
-}
-
-type BusinessCard struct {
-	QRCode string `json:"qrCode"`
-	User   User   `json:"userInfo"`
+	QRCode          []byte   `json:"qrCode"`
 }
