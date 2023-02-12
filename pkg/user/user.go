@@ -10,11 +10,16 @@ import (
 )
 
 func FetchUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (*User, error) {
-	av, _ := dynamodbattribute.MarshalMap(email)
-	result, err := dynaClient.GetItem(&dynamodb.GetItemInput{
-		Key:       av,
+	input := &dynamodb.GetItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"email": {
+				S: aws.String(email),
+			},
+		},
 		TableName: aws.String(tableName),
-	})
+	}
+
+	result, err := dynaClient.GetItem(input)
 
 	if err != nil {
 		log.Printf("Got error while fetching user: %s\n", err)
@@ -65,7 +70,7 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 		return nil, err
 	}
 
-	if currUser != nil {
+	if len(currUser.Email) != 0 {
 		log.Printf("email already exist.")
 		return nil, errors.New("email already exist")
 	}
@@ -122,9 +127,12 @@ func DeleteUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 		return nil, errors.New("no user registered with this email")
 	}
 
-	key, _ := dynamodbattribute.MarshalMap(email)
 	_, err = dynaClient.DeleteItem(&dynamodb.DeleteItemInput{
-		Key:       key,
+		Key: map[string]*dynamodb.AttributeValue{
+			"email": {
+				S: aws.String(email),
+			},
+		},
 		TableName: &tableName,
 	})
 
