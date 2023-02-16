@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"app/pkg/codes"
 	"app/pkg/services"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -26,15 +27,15 @@ func FetchUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (*
 	result, err := dynaClient.GetItem(input)
 
 	if err != nil {
-		log.Printf("Got error while fetching user: %s\n", err)
-		return nil, err
+		log.Printf("%s | %s\n", codes.E008, err)
+		return nil, errors.New(codes.E008)
 	}
 
 	usr := new(User)
 	err = dynamodbattribute.UnmarshalMap(result.Item, usr)
 	if err != nil {
-		log.Printf("Got error mapping fetched user: %s\n", err)
-		return nil, err
+		log.Printf("%s | %s\n", codes.E009, err)
+		return nil, errors.New(codes.E009)
 	}
 
 	return usr, nil
@@ -47,15 +48,15 @@ func FetchUsers(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 
 	result, err := dynaClient.Scan(input)
 	if err != nil {
-		log.Printf("Got error while fetching all users: %s\n", err)
-		return nil, err
+		log.Printf("%s | %s\n", codes.E010, err)
+		return nil, errors.New(codes.E010)
 	}
 
 	users := new([]User)
 	err = dynamodbattribute.UnmarshalListOfMaps(result.Items, users)
 	if err != nil {
-		log.Printf("Got error mapping fetched user: %s\n", err)
-		return nil, err
+		log.Printf("%s | %s\n", codes.E011, err)
+		return nil, errors.New(codes.E011)
 	}
 
 	return users, nil
@@ -71,8 +72,8 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	usr.QRCode = qr
 	item, err := dynamodbattribute.MarshalMap(usr)
 	if err != nil {
-		log.Printf("Got error marshalling new user: %s\n", err)
-		return nil, errors.New("got error marshalling new user")
+		log.Printf("%s | %s\n", codes.E012, err)
+		return nil, errors.New(codes.E012)
 	}
 
 	currUser, err := FetchUser(usr.Email, tableName, dynaClient)
@@ -81,8 +82,8 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	}
 
 	if len(currUser.Email) != 0 {
-		log.Printf("email already exist.")
-		return nil, errors.New("email already exist")
+		log.Printf(codes.E013)
+		return nil, errors.New(codes.E013)
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -92,11 +93,10 @@ func CreateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 
 	_, err = dynaClient.PutItem(input)
 	if err != nil {
-		log.Printf("Got error calling PutItem: %s\n", err)
-		return nil, errors.New("got error calling PutItem")
+		log.Printf("%s | %s\n", codes.E014, err)
+		return nil, errors.New(codes.E014)
 	}
 
-	log.Println("Successfully added '" + usr.Email + " to table " + tableName)
 	return usr, nil
 }
 
@@ -104,7 +104,8 @@ func UpdateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	_, err := FetchUser(usr.Email, tableName, dynaClient)
 
 	if err != nil {
-		return nil, errors.New("no user registered with this email")
+		log.Printf(codes.E015)
+		return nil, errors.New(codes.E015)
 	}
 
 	qr, err := services.GenerateQR(BASE_URL + usr.Email)
@@ -115,14 +116,19 @@ func UpdateUser(usr *User, tableName string, dynaClient *dynamodb.DynamoDB) (*Us
 	usr.QRCode = qr
 	av, err := dynamodbattribute.MarshalMap(usr)
 	if err != nil {
-		log.Printf("Got error marshalling new user: %s\n", err)
-		return nil, errors.New("got error while deserialzing the user's info")
+		log.Printf("%s | %s\n", codes.E016, err)
+		return nil, errors.New(codes.E016)
 	}
 
-	dynaClient.PutItem(&dynamodb.PutItemInput{
+	_, err = dynaClient.PutItem(&dynamodb.PutItemInput{
 		Item:      av,
 		TableName: &tableName,
 	})
+
+	if err != nil {
+		log.Printf("%s | %s\n", codes.E017, err)
+		return nil, errors.New(codes.E017)
+	}
 
 	return usr, nil
 }
@@ -139,8 +145,8 @@ func DeleteUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 	usr, err := FetchUser(email, tableName, dynaClient)
 
 	if err != nil {
-		log.Printf("not found email for deleting: %v\n", email)
-		return nil, errors.New("no user registered with this email")
+		log.Printf(codes.E018)
+		return nil, errors.New(codes.E018)
 	}
 
 	_, err = dynaClient.DeleteItem(&dynamodb.DeleteItemInput{
@@ -153,8 +159,8 @@ func DeleteUser(email string, tableName string, dynaClient *dynamodb.DynamoDB) (
 	})
 
 	if err != nil {
-		log.Printf("got error while deleting user: %s\n", err)
-		return nil, err
+		log.Printf("%s | %s\n", codes.E019, err)
+		return nil, errors.New(codes.E019)
 	}
 
 	return usr, nil
